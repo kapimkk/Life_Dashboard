@@ -10,7 +10,7 @@ export default function RegisterPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (initialized && token) router.replace("/");
+    if (initialized && token) router.replace("/dashboard");
   }, [initialized, token, router]);
 
   return <AuthForm mode="register" />;

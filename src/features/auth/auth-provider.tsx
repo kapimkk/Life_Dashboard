@@ -13,6 +13,11 @@ import { useRouter } from "next/navigation";
 type AuthUser = {
   name: string;
   email: string;
+  onboarding?: {
+    organization: string;
+    mainGoal: string;
+    source: string;
+  };
 };
 
 type AuthContextType = {
@@ -20,7 +25,16 @@ type AuthContextType = {
   token: string | null;
   initialized: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (payload: {
+    name: string;
+    email: string;
+    password: string;
+    onboarding: {
+      organization: string;
+      mainGoal: string;
+      source: string;
+    };
+  }) => Promise<void>;
   logout: () => void;
 };
 
@@ -35,6 +49,16 @@ function createMockToken(email: string) {
 }
 
 type StoredUser = AuthUser & { password: string };
+
+function getNameFromEmail(email: string) {
+  const raw = email.split("@")[0] ?? "usuario";
+  const cleaned = raw.replace(/[._-]+/g, " ").trim();
+  return cleaned
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [boot] = useState(() => {
@@ -62,18 +86,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("E-mail ou senha inválidos.");
     }
 
-    const authUser = { name: found.name, email: found.email };
+    const authUser = {
+      name: found.name || getNameFromEmail(found.email),
+      email: found.email,
+      onboarding: found.onboarding,
+    };
     const nextToken = createMockToken(email);
 
     sessionStorage.setItem(TOKEN_KEY, nextToken);
     sessionStorage.setItem(USER_KEY, JSON.stringify(authUser));
     setUser(authUser);
     setToken(nextToken);
-    router.push("/");
+    router.push("/dashboard");
   }, [router]);
 
   const register = useCallback(
-    async (name: string, email: string, password: string) => {
+    async (payload: {
+      name: string;
+      email: string;
+      password: string;
+      onboarding: {
+        organization: string;
+        mainGoal: string;
+        source: string;
+      };
+    }) => {
+      const { name, email, password, onboarding } = payload;
       const users = JSON.parse(
         localStorage.getItem(USERS_KEY) ?? "[]",
       ) as StoredUser[];
@@ -81,7 +119,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("E-mail já cadastrado.");
       }
 
-      users.push({ name, email, password });
+      users.push({
+        name: name.trim() || getNameFromEmail(email),
+        email,
+        password,
+        onboarding,
+      });
       localStorage.setItem(USERS_KEY, JSON.stringify(users));
       await login(email, password);
     },
@@ -93,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem(USER_KEY);
     setUser(null);
     setToken(null);
-    router.push("/login");
+    router.push("/");
   }, [router]);
 
   const value = useMemo(
